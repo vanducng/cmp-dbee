@@ -3,24 +3,67 @@ local dbee_core = require("dbee.api.core")
 local Database = {}
 Database.cache = {} -- Cache for storing the current database structure
 Database.column_cache = {} -- Cache for storing columns of specific tables
+Database.cache_expiry_s = 10 -- seconds
+Database.cache_last_updated = {}
+Database.initial_buffer = nil -- Buffer where the connection was established
+
+Database.get_current_connection = function()
+  local ok, connection_id = pcall(dbee_core.get_current_connection)
+  if not ok then
+    return nil
+  end
+
+  if connection_id and not Database.initial_buffer then
+    -- Store the initial buffer where connection is opened
+    Database.initial_buffer = vim.api.nvim_get_current_buf()
+  end
+
+  return connection_id
+end
 
 -- Function to get the current database structure
 Database.get_db_structure = function()
-  local connection_id = dbee_core.get_current_connection()
+  local connection_id = Database.get_current_connection()
+  if not connection_id then
+    return {}
+  end
+  if
+    Database.cache[connection_id.id]
+    and os.time() - (Database.cache_last_updated[connection_id.id] or 0) < Database.cache_expiry_s
+  then
+    print("Using cached structure")
+    return Database.cache[connection_id.id]
+  end
+
+  print("Fetching structure")
+  -- Fetch and cache the structure
+  local structure = dbee_core.connection_get_structure(connection_id.id)
+  Database.cache[connection_id.id] = structure
+  Database.cache_last_updated[connection_id.id] = os.time()
+  return structure
+end
+
+Database.get_models = function(schema)
+  local connection_id = Database.get_current_connection()
   if not connection_id then
     return {}
   end
 
-  -- Check if the cache is already populated
-  if Database.cache[connection_id.id] then
-    return Database.cache[connection_id.id] -- Return cached structure
+  local structure = Database.get_db_structure()
+  if not structure then
+    return {}
   end
 
-  -- If not cached, fetch the structure and store it
-  local structure = dbee_core.connection_get_structure(connection_id.id)
-  Database.cache[connection_id.id] = structure
+  local models = {}
+  for _, s in ipairs(structure) do
+    if s.name == schema then
+      for _, model in ipairs(s.children or {}) do
+        table.insert(models, model)
+      end
+    end
+  end
 
-  return structure
+  return models
 end
 
 -- Function to get column completions for a specific schema and model
@@ -67,6 +110,7 @@ local function clear_cache()
     Database.cache[connection_id.id] = nil -- Clear the cache for this connection
     Database.column_cache[connection_id.id] = nil -- Clear the column cache for this connection
   end
+  Database.initial_buffer = nil -- Reset the buffer ID
 end
 
 -- Register event listeners to invalidate the cache
