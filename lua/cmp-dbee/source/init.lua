@@ -83,8 +83,7 @@ Source.complete = function(self, params, callback)
   local ts_references = Parser.get_references_at_cursor()
 
   if re_references then
-    -- Check if the reference is an alias
-    local alias_found = false
+    -- Check if the reference is an alias or a schema
     if ts_references and ts_references.schema_table_references then
       for _, ref in ipairs(ts_references.schema_table_references) do
         if ref.alias == re_references then
@@ -100,16 +99,14 @@ Source.complete = function(self, params, callback)
       end
     end
 
-    -- Check if the reference is a schema (default behavior)
-    if not alias_found then
-      local schema = re_references
-      local models = Database.get_models(schema)
-      local model_items = map_models_to_completion_items(models, schema)
+    -- If no alias found, treat the reference as a schema
+    local schema = re_references
+    local models = Database.get_models(schema)
+    local model_items = map_models_to_completion_items(models, schema)
 
-      -- Early callback with schema-specific model items
-      callback { items = model_items, isIncomplete = false }
-      return
-    end
+    -- Early callback with schema-specific model items
+    callback { items = model_items, isIncomplete = false }
+    return
   end
 
   -- Default completion logic (schemas, tables, columns, etc.)
