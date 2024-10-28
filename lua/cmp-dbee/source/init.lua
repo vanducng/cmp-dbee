@@ -1,6 +1,6 @@
 local cmp = require("cmp")
 local Database = require("cmp-dbee.database")
-local Parser = require("cmp-dbee.treesitter.parser")
+local Parser = require("cmp-dbee.treesitter.init")
 local Utils = require("cmp-dbee.source.utils")
 
 local Source = {}

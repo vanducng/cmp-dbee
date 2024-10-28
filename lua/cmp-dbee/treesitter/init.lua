@@ -1,6 +1,18 @@
+---@mod cmp-dbee.parser Parser Module
+---@brief [[
+---This module provides functions to parse SQL queries using Tree-sitter,
+---including retrieving the root node, the node under the cursor, and references
+---to CTEs, schemas, tables, and aliases.
+---
+---Access it like this:
+--->
+---local Parser = require("cmp-dbee.treesitter")
+---<
+---@brief ]]
+
+---@class Parser
 local Parser = {}
 
--- SQL specific queries for Tree-sitter.
 Parser.filetype = "sql"
 Parser.query_object_reference = [[
 (relation
@@ -15,7 +27,8 @@ Parser.query_object_reference = [[
 
 Parser.query_cte_references = "(cte (identifier) @cte)"
 
--- Get the root of the AST for the current buffer if it matches the filetype.
+--- Get the root of the AST for the current buffer if it matches the filetype.
+--- @return TSNode|nil The root node of the AST or nil if the filetype does not match.
 function Parser.get_root()
   local bufnr = vim.api.nvim_get_current_buf()
   if vim.bo[bufnr].filetype ~= Parser.filetype then
@@ -26,7 +39,8 @@ function Parser.get_root()
   return parser:parse()[1]:root()
 end
 
--- Get the node under the cursor.
+--- Get the node under the cursor.
+--- @return TSNode|nil The node under the cursor or nil if not found.
 function Parser.get_cursor_node()
   local bufnr = vim.api.nvim_get_current_buf()
   local cursor_row = vim.api.nvim_win_get_cursor(0)[1]
@@ -51,7 +65,9 @@ function Parser.get_cursor_node()
   return nil
 end
 
--- Retrieve CTE references from the current cursor node or a specified node.
+--- Retrieve CTE references from the current cursor node or a specified node.
+--- @param node TSNode The node to retrieve CTE references from.
+--- @return CTEReference A list of CTE references.
 local function get_cte_references(node)
   local captures = {}
   local query = vim.treesitter.query.parse(Parser.filetype, Parser.query_cte_references)
@@ -65,7 +81,9 @@ local function get_cte_references(node)
   return captures
 end
 
--- Retrieve schema, table, and alias references from the current cursor node or a specified node.
+--- Retrieve schema, table, and alias references from the current cursor node or a specified node.
+--- @param node TSNode The node to retrieve schema, table, and alias references from.
+--- @return SchemaTableAliasReference A list of schema, table, and alias references.
 local function get_schema_table_alias_references(node)
   local out = {}
   local query = vim.treesitter.query.parse(Parser.filetype, Parser.query_object_reference)
@@ -97,8 +115,8 @@ local function get_schema_table_alias_references(node)
   return out
 end
 
--- New function to get all references based on the cursor position
--- TODO: fix so that you can capture multiple statement without having to add ';' at the end.
+--- Get all references (cte, schemas, table, alias etc) based on the cursor position.
+--- @return ReferencesAtCursor|nil A table containing CTE references and schema, table, and alias references, or nil if no node is found.
 function Parser.get_references_at_cursor()
   local current_node = Parser.get_cursor_node()
   if not current_node then
