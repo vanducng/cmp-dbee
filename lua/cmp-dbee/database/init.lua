@@ -20,7 +20,7 @@ Database.cache_expiry_s = 10 -- seconds
 Database.cache_last_updated = {}
 
 --- Get the current connection ID.
---- @return ConnectionID|nil connection_id The current connection ID or nil if not available.
+--- @return ConnectionParams|nil connection_id The current connection ID or nil if not available.
 function Database.get_current_connection()
   local ok, connection_id = pcall(dbee_core.get_current_connection)
   if not ok then
@@ -40,10 +40,11 @@ end
 --- @param callback Callback Callback function to return the database structure (cached or not).
 function Database.get_db_structure(callback)
   local connection_id = Database.get_current_connection()
-  if not connection_id then
+  if connection_id == nil then
     callback {}
     return
   end
+
   if
     Database.cache[connection_id.id]
     and os.time() - (Database.cache_last_updated[connection_id.id] or 0) < Database.cache_expiry_s
