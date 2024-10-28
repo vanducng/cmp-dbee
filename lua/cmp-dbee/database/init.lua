@@ -20,55 +20,63 @@ Database.is_available = function()
 end
 
 -- Function to get the current database structure
-Database.get_db_structure = function()
+Database.get_db_structure = function(callback)
   local connection_id = Database.get_current_connection()
   if not connection_id then
-    return {}
+    callback {}
+    return
   end
   if
     Database.cache[connection_id.id]
     and os.time() - (Database.cache_last_updated[connection_id.id] or 0) < Database.cache_expiry_s
   then
     -- TODO: print("Using cached structure")
-    return Database.cache[connection_id.id]
+    callback(Database.cache[connection_id.id])
+    return
   end
 
   -- TODO: print("Fetching structure")
-  -- Fetch and cache the structure
-  local structure = dbee_core.connection_get_structure(connection_id.id)
-  Database.cache[connection_id.id] = structure
-  Database.cache_last_updated[connection_id.id] = os.time()
-  return structure
+  -- Fetch and cache the structure asynchronously
+  vim.defer_fn(function()
+    local structure = dbee_core.connection_get_structure(connection_id.id)
+    Database.cache[connection_id.id] = structure
+    Database.cache_last_updated[connection_id.id] = os.time()
+    callback(structure)
+  end, 0)
 end
 
-Database.get_models = function(schema)
+Database.get_models = function(schema, callback)
   local connection_id = Database.get_current_connection()
   if not connection_id then
-    return {}
+    callback {}
+    return
   end
 
-  local structure = Database.get_db_structure()
-  if not structure then
-    return {}
-  end
+  Database.get_db_structure(function(structure)
+    if not structure then
+      callback {}
+      return
+    end
 
-  local models = {}
-  for _, s in ipairs(structure) do
-    if s.name == schema then
-      for _, model in ipairs(s.children or {}) do
-        table.insert(models, model)
+    local models = {}
+    for _, s in ipairs(structure) do
+      if s.name == schema then
+        for _, model in ipairs(s.children or {}) do
+          table.insert(models, model)
+        end
       end
     end
-  end
 
-  return models
+    callback(models)
+  end)
 end
 
 -- Function to get column completions for a specific schema and model
-Database.get_column_completion = function(schema, model)
+Database.get_column_completion = function(schema, model, callback)
   local connection_id = dbee_core.get_current_connection()
   if not connection_id then
-    return {}
+    callback {}
+    return
   end
 
   -- Check if columns for the specified model are cached
@@ -77,28 +85,32 @@ Database.get_column_completion = function(schema, model)
     and Database.column_cache[connection_id.id][schema]
     and Database.column_cache[connection_id.id][schema][model]
   then
-    return Database.column_cache[connection_id.id][schema][model] -- Return cached columns
+    callback(Database.column_cache[connection_id.id][schema][model]) -- Return cached columns
+    return
   end
 
-  -- If not cached, fetch the columns from the database
+  -- If not cached, fetch the columns from the database asynchronously
   -- TODO: materialization hardcoded to be table for now
   local opts = { table = model, schema = schema, materialization = "table" }
-  local ok, columns = pcall(dbee_core.connection_get_columns, connection_id.id, opts)
-  if not ok then
-    -- TODO: vim.notify("Failed to fetch columns for " .. schema .. "." .. model, vim.log.levels.ERROR)
-    return {}
-  end
+  vim.defer_fn(function()
+    local ok, columns = pcall(dbee_core.connection_get_columns, connection_id.id, opts)
+    if not ok then
+      -- TODO: vim.notify("Failed to fetch columns for " .. schema .. "." .. model, vim.log.levels.ERROR)
+      callback {}
+      return
+    end
 
-  -- Ensure the cache structure exists
-  if not Database.column_cache[connection_id.id] then
-    Database.column_cache[connection_id.id] = {}
-  end
-  if not Database.column_cache[connection_id.id][schema] then
-    Database.column_cache[connection_id.id][schema] = {}
-  end
+    -- Ensure the cache structure exists
+    if not Database.column_cache[connection_id.id] then
+      Database.column_cache[connection_id.id] = {}
+    end
+    if not Database.column_cache[connection_id.id][schema] then
+      Database.column_cache[connection_id.id][schema] = {}
+    end
 
-  Database.column_cache[connection_id.id][schema][model] = columns -- Cache the fetched columns
-  return columns
+    Database.column_cache[connection_id.id][schema][model] = columns -- Cache the fetched columns
+    callback(columns)
+  end, 0)
 end
 
 -- Function to manually clear the cache for the current connection

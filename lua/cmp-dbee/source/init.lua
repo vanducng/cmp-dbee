@@ -74,80 +74,88 @@ end
 
 -- Completion function for the Dbee source
 Source.complete = function(_, _, callback)
-  local db_structure = Database.get_db_structure() -- Fetch the cached structure
-  local line = Utils:get_cursor_before_line()
-  local re_references = Utils:captured_schema(line)
-  local ts_references = Parser.get_references_at_cursor()
-  local items = {}
+  Database.get_db_structure(function(db_structure)
+    local line = Utils:get_cursor_before_line()
+    local re_references = Utils:captured_schema(line)
+    local ts_references = Parser.get_references_at_cursor()
+    local items = {}
 
-  if re_references then
-    -- Check if the reference is an alias or a schema
+    if re_references then
+      -- Check if the reference is an alias or a schema
+      if ts_references and ts_references.schema_table_references then
+        for _, ref in ipairs(ts_references.schema_table_references) do
+          if ref.alias == re_references then
+            -- Alias found; retrieve columns for schema + table associated with the alias
+            local schema, model = ref.schema, ref.model
+            Database.get_column_completion(schema, model, function(columns)
+              local column_items = map_to_column_completion_items(columns, schema, model)
+
+              -- Early callback with column items for the alias
+              callback { items = column_items, isIncomplete = false }
+            end)
+            return
+          end
+        end
+      end
+
+      -- If no alias found, treat the reference as a schema
+      local schema = re_references
+      Database.get_models(schema, function(models)
+        local model_items = map_models_to_completion_items(models, schema)
+
+        -- Early callback with schema-specific model items
+        callback { items = model_items, isIncomplete = false }
+      end)
+      return
+    end
+
+    -- Default completion logic (schemas, tables, columns, etc.)
+    items = map_to_completion_items(db_structure)
+
+    -- Add CTE references if available
+    if ts_references and ts_references.cte_references then
+      for _, cte in ipairs(ts_references.cte_references) do
+        table.insert(items, {
+          label = cte.cte,
+          kind = cmp.lsp.CompletionItemKind.Struct,
+          documentation = "CTE: " .. cte.cte,
+          priority = 100,
+        })
+      end
+    end
+
+    -- Add schema and table references if available
     if ts_references and ts_references.schema_table_references then
-      for _, ref in ipairs(ts_references.schema_table_references) do
-        if ref.alias == re_references then
-          -- Alias found; retrieve columns for schema + table associated with the alias
-          local schema, model = ref.schema, ref.model
-          local columns = Database.get_column_completion(schema, model)
-          local column_items = map_to_column_completion_items(columns, schema, model)
+      for _, refs in ipairs(ts_references.schema_table_references) do
+        local schema, model, alias = refs.schema, refs.model, refs.alias
 
-          -- Early callback with column items for the alias
-          callback { items = column_items, isIncomplete = false }
+        if schema and model and schema ~= "" and model ~= "" then
+          Database.get_column_completion(schema, model, function(columns)
+            local column_items = map_to_column_completion_items(columns, schema, model)
+
+            if alias then
+              table.insert(items, {
+                label = alias,
+                kind = cmp.lsp.CompletionItemKind.Text,
+                documentation = "Alias for " .. schema .. "." .. model,
+                priority = 200,
+              })
+            end
+
+            -- Combine the items
+            items = vim.list_extend(items, column_items)
+
+            -- Final callback with full items list
+            callback { items = items, isIncomplete = false }
+          end)
           return
         end
       end
     end
 
-    -- If no alias found, treat the reference as a schema
-    local schema = re_references
-    local models = Database.get_models(schema)
-    local model_items = map_models_to_completion_items(models, schema)
-
-    -- Early callback with schema-specific model items
-    callback { items = model_items, isIncomplete = false }
-    return
-  end
-
-  -- Default completion logic (schemas, tables, columns, etc.)
-  items = map_to_completion_items(db_structure)
-
-  -- Add CTE references if available
-  if ts_references and ts_references.cte_references then
-    for _, cte in ipairs(ts_references.cte_references) do
-      table.insert(items, {
-        label = cte.cte,
-        kind = cmp.lsp.CompletionItemKind.Struct,
-        documentation = "CTE: " .. cte.cte,
-        priority = 100,
-      })
-    end
-  end
-
-  -- Add schema and table references if available
-  if ts_references and ts_references.schema_table_references then
-    for _, refs in ipairs(ts_references.schema_table_references) do
-      local schema, model, alias = refs.schema, refs.model, refs.alias
-
-      if schema and model and schema ~= "" and model ~= "" then
-        local columns = Database.get_column_completion(schema, model)
-        local column_items = map_to_column_completion_items(columns, schema, model)
-
-        if alias then
-          table.insert(items, {
-            label = alias,
-            kind = cmp.lsp.CompletionItemKind.Text,
-            documentation = "Alias for " .. schema .. "." .. model,
-            priority = 200,
-          })
-        end
-
-        -- Combine the items
-        items = vim.list_extend(items, column_items)
-      end
-    end
-  end
-
-  -- Final callback with full items list
-  callback { items = items, isIncomplete = false }
+    -- Final callback with full items list
+    callback { items = items, isIncomplete = false }
+  end)
 end
 
 -- Create a new source object
