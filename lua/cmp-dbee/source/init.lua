@@ -1,11 +1,25 @@
+---@mod cmp-dbee.source Source Module
+---@brief [[
+---This module provides functions to map database schemas, tables, and columns
+---to completion items for the cmp-dbee plugin.
+---
+---Access it like this:
+--->
+---local Source = require("cmp-dbee.source")
+---<
+---@brief ]]
+
 local cmp = require("cmp")
 local Database = require("cmp-dbee.database")
 local Parser = require("cmp-dbee.treesitter.init")
 local Utils = require("cmp-dbee.source.utils")
 
+--- @class Source
 local Source = {}
 
--- Function to map database schemas and tables to completion items
+--- Function to map database schemas and tables to completion items
+--- @param db_structure DBStructure[] The database structure to map.
+--- @return table The list of completion items.
 local function map_to_completion_items(db_structure)
   local items = {}
 
@@ -37,7 +51,11 @@ local function map_to_completion_items(db_structure)
   return items
 end
 
--- Function to map columns to completion items
+--- Function to map columns to completion items
+--- @param columns Column[] The columns to map.
+--- @param schema string The schema name.
+--- @param model string The model name.
+--- @return table The list of completion items.
 local function map_to_column_completion_items(columns, schema, model)
   local items = {}
   for _, column in ipairs(columns) do
@@ -58,7 +76,10 @@ local function map_to_column_completion_items(columns, schema, model)
   return items
 end
 
--- Function to map models to completion items
+--- Function to map models to completion items
+--- @param models DBStructure[] The models to map.
+--- @param schema string The schema name.
+--- @return table The list of completion items.
 local function map_models_to_completion_items(models, schema)
   local items = {}
   for _, model in ipairs(models) do
@@ -72,7 +93,8 @@ local function map_models_to_completion_items(models, schema)
   return items
 end
 
--- Completion function for the Dbee source
+--- Completion function for the Dbee source
+--- @param callback Callback The callback function to return the completion items.
 Source.complete = function(_, _, callback)
   Database.get_db_structure(function(db_structure)
     local line = Utils:get_cursor_before_line()
@@ -85,12 +107,12 @@ Source.complete = function(_, _, callback)
       if ts_references and ts_references.schema_table_references then
         for _, ref in ipairs(ts_references.schema_table_references) do
           if ref.alias == re_references then
-            -- Alias found; retrieve columns for schema + table associated with the alias
+            -- Alias found -> retrieve columns for schema + table associated with the alias
             local schema, model = ref.schema, ref.model
             Database.get_column_completion(schema, model, function(columns)
               local column_items = map_to_column_completion_items(columns, schema, model)
 
-              -- Early callback with column items for the alias
+              -- exit early with column items
               callback { items = column_items, isIncomplete = false }
             end)
             return
@@ -98,12 +120,12 @@ Source.complete = function(_, _, callback)
         end
       end
 
-      -- If no alias found, treat the reference as a schema
+      -- If no alias found -> treat the reference as a schema
       local schema = re_references
       Database.get_models(schema, function(models)
         local model_items = map_models_to_completion_items(models, schema)
 
-        -- Early callback with schema-specific model items
+        -- exit early with model items
         callback { items = model_items, isIncomplete = false }
       end)
       return
@@ -144,8 +166,6 @@ Source.complete = function(_, _, callback)
 
             -- Combine the items
             items = vim.list_extend(items, column_items)
-
-            -- Final callback with full items list
             callback { items = items, isIncomplete = false }
           end)
           return
@@ -153,26 +173,31 @@ Source.complete = function(_, _, callback)
       end
     end
 
-    -- Final callback with full items list
+    -- Default completion items
     callback { items = items, isIncomplete = false }
   end)
 end
 
--- Create a new source object
+--- Construct a new source object
+--- @return Source The new source object.
 Source.new = function()
   return setmetatable({}, { __index = Source })
 end
 
--- Return the debug name for the source
+--- Return the debug name for the source
+--- @return string The debug name.
 Source.get_debug_name = function()
   return "cmp-dbee"
 end
 
--- Check if the source is available for completion
+--- Check if the source is available for completion
+--- @return boolean True if the source is available, false otherwise.
 Source.is_available = function()
   return Database.is_available()
 end
 
+--- Get the trigger characters for the source
+--- @return string[] The list of trigger characters.
 Source.get_trigger_characters = function()
   return { '"', "`", "[", "]", ".", "(", ")" }
 end
