@@ -19,7 +19,6 @@ Parser.query_cte_references = "(cte (identifier) @cte)"
 function Parser.get_root()
   local bufnr = vim.api.nvim_get_current_buf()
   if vim.bo[bufnr].filetype ~= Parser.filetype then
-    vim.notify("Filetype is not " .. Parser.filetype)
     return nil
   end
 
@@ -33,7 +32,6 @@ function Parser.get_cursor_node()
   local cursor_row = vim.api.nvim_win_get_cursor(0)[1]
 
   if vim.bo[bufnr].filetype ~= Parser.filetype then
-    vim.notify("Filetype is not " .. Parser.filetype)
     return nil
   end
 
@@ -62,16 +60,6 @@ local function get_cte_references(node)
   for _, n in query:iter_captures(node, bufnr) do
     local found = vim.treesitter.get_node_text(n, bufnr)
     table.insert(captures, { cte = found })
-    -- Debugging statement for CTE references
-    vim.notify("Found CTE: " .. found, vim.log.levels.DEBUG)
-
-    -- Debugging iter_captures
-    local capture_type = n:type()
-    local capture_text = vim.treesitter.get_node_text(n, bufnr)
-    vim.notify(
-      "iter_captures: Type: " .. capture_type .. ", Text: " .. capture_text,
-      vim.log.levels.DEBUG
-    )
   end
 
   return captures

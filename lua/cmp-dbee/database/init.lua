@@ -29,11 +29,11 @@ Database.get_db_structure = function()
     Database.cache[connection_id.id]
     and os.time() - (Database.cache_last_updated[connection_id.id] or 0) < Database.cache_expiry_s
   then
-    print("Using cached structure")
+    -- TODO: print("Using cached structure")
     return Database.cache[connection_id.id]
   end
 
-  print("Fetching structure")
+  -- TODO: print("Fetching structure")
   -- Fetch and cache the structure
   local structure = dbee_core.connection_get_structure(connection_id.id)
   Database.cache[connection_id.id] = structure
@@ -85,7 +85,7 @@ Database.get_column_completion = function(schema, model)
   local opts = { table = model, schema = schema, materialization = "table" }
   local ok, columns = pcall(dbee_core.connection_get_columns, connection_id.id, opts)
   if not ok then
-    vim.notify("Failed to fetch columns for " .. schema .. "." .. model, vim.log.levels.ERROR)
+    -- TODO: vim.notify("Failed to fetch columns for " .. schema .. "." .. model, vim.log.levels.ERROR)
     return {}
   end
 
