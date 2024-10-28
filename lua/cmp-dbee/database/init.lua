@@ -1,24 +1,22 @@
 local dbee_core = require("dbee.api.core")
+local dbee_ui = require("dbee.api.ui")
 
 local Database = {}
 Database.cache = {} -- Cache for storing the current database structure
 Database.column_cache = {} -- Cache for storing columns of specific tables
 Database.cache_expiry_s = 10 -- seconds
 Database.cache_last_updated = {}
-Database.initial_buffer = nil -- Buffer where the connection was established
 
 Database.get_current_connection = function()
   local ok, connection_id = pcall(dbee_core.get_current_connection)
   if not ok then
     return nil
   end
-
-  if connection_id and not Database.initial_buffer then
-    -- Store the initial buffer where connection is opened
-    Database.initial_buffer = vim.api.nvim_get_current_buf()
-  end
-
   return connection_id
+end
+
+Database.is_available = function()
+  return dbee_core.is_loaded() and dbee_ui.is_loaded()
 end
 
 -- Function to get the current database structure
@@ -110,7 +108,6 @@ local function clear_cache()
     Database.cache[connection_id.id] = nil -- Clear the cache for this connection
     Database.column_cache[connection_id.id] = nil -- Clear the column cache for this connection
   end
-  Database.initial_buffer = nil -- Reset the buffer ID
 end
 
 -- Register event listeners to invalidate the cache

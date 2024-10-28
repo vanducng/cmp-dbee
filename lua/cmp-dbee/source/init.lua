@@ -73,14 +73,12 @@ local function map_models_to_completion_items(models, schema)
 end
 
 -- Completion function for the Dbee source
-Source.complete = function(self, params, callback)
+Source.complete = function(_, _, callback)
   local db_structure = Database.get_db_structure() -- Fetch the cached structure
-  local items = {}
-
   local line = Utils:get_cursor_before_line()
   local re_references = Utils:captured_schema(line)
-  -- get treesitter context (schema, table, alias, ctes, etc)
   local ts_references = Parser.get_references_at_cursor()
+  local items = {}
 
   if re_references then
     -- Check if the reference is an alias or a schema
@@ -164,7 +162,7 @@ end
 
 -- Check if the source is available for completion
 Source.is_available = function()
-  return true
+  return Database.is_available()
 end
 
 Source.get_trigger_characters = function()
