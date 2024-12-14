@@ -201,7 +201,7 @@ end
 --- Return the debug name for the source
 --- @return string The debug name.
 Source.get_debug_name = function()
-  return "cmp-dbee"
+  return "dbee"
 end
 
 --- Check if the source is available for completion
