@@ -1,10 +1,8 @@
 local M = {}
 
--- Function to get the text of the line before the cursor
+--- Get the text of the line before the cursor
+---@return string The text of the line before the cursor
 function M:get_cursor_before_line()
-  -- local lines = vim.api.nvim_buf_get_lines(0, 0, vim.api.nvim_win_get_cursor(0)[1], false)
-
-  -- Get the current line number and cursor position
   local line_number = vim.fn.line(".")
   local col_number = vim.fn.col(".")
 
@@ -23,35 +21,12 @@ function M:get_cursor_before_line()
   return ""
 end
 
--- Function to get the schema from the line before the cursor
+--- The schema is the text between the last space or opening parenthesis and the dot
+---@param line? string The line to get the schema from
+---@return any
 function M:captured_schema(line)
   local cursor_before_line = line or self:get_cursor_before_line()
   return cursor_before_line:match("[%s%(]+([%w_]+)%.$")
-end
-
--- Function to check if a table exists in a list
-function M:table_exist_in_list(list, target_table)
-  for _, tbl in ipairs(list) do
-    if self:table_equal(tbl, target_table) then
-      return true
-    end
-  end
-  return false
-end
-
--- Function to check if two tables are equal
-function M:table_equal(table1, table2)
-  if #table1 ~= #table2 then
-    return false
-  end
-
-  for k, v in pairs(table1) do
-    if table2[k] ~= v then
-      return false
-    end
-  end
-
-  return true
 end
 
 return M
