@@ -42,9 +42,9 @@ local function map_to_completion_items(db_structure)
     table.insert(
       items,
       create_completion_item(
-        schema.name,
+        tostring(schema.name or ""),
         cmp.lsp.CompletionItemKind.Struct,
-        "Type: " .. schema.type .. "\nSchema: " .. schema.schema,
+        "Type: " .. tostring(schema.type or "") .. "\nSchema: " .. tostring(schema.schema or ""),
         100
       )
     )
@@ -53,9 +53,9 @@ local function map_to_completion_items(db_structure)
       table.insert(
         items,
         create_completion_item(
-          model.name,
+          tostring(model.name or ""),
           cmp.lsp.CompletionItemKind.Text,
-          "Type: " .. model.type .. "\nName: " .. model.name .. "\nSchema: " .. model.schema,
+          "Type: " .. tostring(model.type or "") .. "\nName: " .. tostring(model.name or "") .. "\nSchema: " .. tostring(model.schema or ""),
           100
         )
       )
@@ -75,16 +75,16 @@ local function map_columns_to_completion_items(columns, schema, model)
     table.insert(
       items,
       create_completion_item(
-        column.name,
+        tostring(column.name or ""),
         cmp.lsp.CompletionItemKind.Field,
         "Column Name: "
-          .. column.name
+          .. tostring(column.name or "")
           .. "\nType: "
-          .. column.type
+          .. tostring(column.type or "")
           .. "\nSchema: "
-          .. schema
+          .. tostring(schema or "")
           .. "\nModel: "
-          .. model,
+          .. tostring(model or ""),
         1000
       )
     )
@@ -102,9 +102,9 @@ local function map_models_to_completion_items(models, schema)
     table.insert(
       items,
       create_completion_item(
-        model.name,
+        tostring(model.name or ""),
         cmp.lsp.CompletionItemKind.Text,
-        "Type: " .. model.type .. "\nName: " .. model.name .. "\nSchema: " .. schema,
+        "Type: " .. tostring(model.type or "") .. "\nName: " .. tostring(model.name or "") .. "\nSchema: " .. tostring(schema or ""),
         100
       )
     )
@@ -153,9 +153,9 @@ Source.complete = function(_, _, callback)
           table.insert(
             items,
             create_completion_item(
-              cte.cte,
+              tostring(cte.cte or ""),
               cmp.lsp.CompletionItemKind.Struct,
-              "CTE: " .. cte.cte,
+              "CTE: " .. tostring(cte.cte or ""),
               100
             )
           )
@@ -171,9 +171,9 @@ Source.complete = function(_, _, callback)
                 table.insert(
                   items,
                   create_completion_item(
-                    refs.alias,
+                    tostring(refs.alias or ""),
                     cmp.lsp.CompletionItemKind.Text,
-                    "Alias for " .. refs.schema .. "." .. refs.model,
+                    "Alias for " .. tostring(refs.schema or "") .. "." .. tostring(refs.model or ""),
                     200
                   )
                 )

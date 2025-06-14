@@ -18,16 +18,21 @@ local BlinkDbeeProvider = {}
 --- @param priority number The priority of the completion item.
 --- @return table The completion item.
 local function create_blink_completion_item(label, kind, documentation, priority)
+  -- Ensure type safety for string.format to prevent E5101 errors
+  local safe_label = tostring(label or "")
+  local safe_priority = tonumber(priority) or 0
+  local safe_documentation = tostring(documentation or "")
+  
   return {
-    label = label,
+    label = safe_label,
     kind = kind,
     documentation = {
       kind = "markdown",
-      value = documentation,
+      value = safe_documentation,
     },
-    sortText = string.format("%04d_%s", 10000 - priority, label),
-    filterText = label,
-    insertText = label,
+    sortText = string.format("%04d_%s", 10000 - safe_priority, safe_label),
+    filterText = safe_label,
+    insertText = safe_label,
   }
 end
 
@@ -41,9 +46,9 @@ local function map_to_blink_completion_items(db_structure)
     table.insert(
       items,
       create_blink_completion_item(
-        schema.name,
+        tostring(schema.name or ""),
         17, -- Struct kind in blink.cmp
-        "**Type:** " .. schema.type .. "\n**Schema:** " .. schema.schema,
+        "**Type:** " .. tostring(schema.type or "") .. "\n**Schema:** " .. tostring(schema.schema or ""),
         100
       )
     )
@@ -52,9 +57,9 @@ local function map_to_blink_completion_items(db_structure)
       table.insert(
         items,
         create_blink_completion_item(
-          model.name,
+          tostring(model.name or ""),
           1, -- Text kind in blink.cmp
-          "**Type:** " .. model.type .. "\n**Name:** " .. model.name .. "\n**Schema:** " .. model.schema,
+          "**Type:** " .. tostring(model.type or "") .. "\n**Name:** " .. tostring(model.name or "") .. "\n**Schema:** " .. tostring(model.schema or ""),
           100
         )
       )
@@ -74,9 +79,9 @@ local function map_columns_to_blink_completion_items(columns, schema, model)
     table.insert(
       items,
       create_blink_completion_item(
-        column.name,
+        tostring(column.name or ""),
         5, -- Field kind in blink.cmp
-        "**Column:** " .. column.name .. "\n**Type:** " .. column.type .. "\n**Schema:** " .. schema .. "\n**Table:** " .. model,
+        "**Column:** " .. tostring(column.name or "") .. "\n**Type:** " .. tostring(column.type or "") .. "\n**Schema:** " .. tostring(schema or "") .. "\n**Table:** " .. tostring(model or ""),
         1000
       )
     )
@@ -94,9 +99,9 @@ local function map_models_to_blink_completion_items(models, schema)
     table.insert(
       items,
       create_blink_completion_item(
-        model.name,
+        tostring(model.name or ""),
         1, -- Text kind in blink.cmp
-        "**Type:** " .. model.type .. "\n**Name:** " .. model.name .. "\n**Schema:** " .. schema,
+        "**Type:** " .. tostring(model.type or "") .. "\n**Name:** " .. tostring(model.name or "") .. "\n**Schema:** " .. tostring(schema or ""),
         100
       )
     )
@@ -148,9 +153,9 @@ function BlinkDbeeProvider:get_completions(context, callback)
           table.insert(
             items,
             create_blink_completion_item(
-              cte.cte,
+              tostring(cte.cte or ""),
               17, -- Struct kind in blink.cmp
-              "**CTE:** " .. cte.cte,
+              "**CTE:** " .. tostring(cte.cte or ""),
               100
             )
           )
@@ -166,9 +171,9 @@ function BlinkDbeeProvider:get_completions(context, callback)
                 table.insert(
                   items,
                   create_blink_completion_item(
-                    refs.alias,
+                    tostring(refs.alias or ""),
                     1, -- Text kind in blink.cmp
-                    "**Alias for:** " .. refs.schema .. "." .. refs.model,
+                    "**Alias for:** " .. tostring(refs.schema or "") .. "." .. tostring(refs.model or ""),
                     200
                   )
                 )

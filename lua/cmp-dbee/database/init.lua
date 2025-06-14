@@ -144,8 +144,10 @@ local function clear_cache()
   end
 end
 
--- Register event listeners to invalidate the cache
-dbee_core.register_event_listener("current_connection_changed", clear_cache)
-dbee_core.register_event_listener("database_selected", clear_cache)
+-- Register event listeners to invalidate the cache (safely)
+pcall(function()
+  dbee_core.register_event_listener("current_connection_changed", clear_cache)
+  dbee_core.register_event_listener("database_selected", clear_cache)
+end)
 
 return Database
