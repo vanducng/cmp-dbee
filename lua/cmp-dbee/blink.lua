@@ -144,16 +144,55 @@ function BlinkDbeeProvider:get_completions(context, callback)
       local is_snowflake = current_connection and current_connection.type == "snowflake"
       
       if is_snowflake then
-        -- For Snowflake, database.schema.table syntax is common
-        -- When user types "database.", show schemas from that database
-        -- But we need to be careful about cross-database queries
-        Database.get_models(re_references, function(models)
-          callback({
-            items = map_models_to_blink_completion_items(models, re_references),
-            is_incomplete_forward = false,
-            is_incomplete_backward = false,
-          })
-        end)
+        -- For Snowflake, handle three-part naming: database.schema.table
+        local snowflake_parts = Utils:captured_snowflake_parts(line)
+        
+        if snowflake_parts then
+          -- User typed "database.schema.", show tables from that schema
+          print("cmp-dbee: Snowflake three-part reference detected: " .. snowflake_parts.database .. "." .. snowflake_parts.schema)
+          
+          -- For cross-database queries in Snowflake, we need to be very careful
+          -- Instead of making a potentially failing query, return a helpful message
+          -- or try to use the current database structure
+          
+          -- Check if the referenced database matches current connection database
+          local current_db = current_connection.url and current_connection.url:match("database=([^&]+)")
+          
+          if current_db and string.upper(current_db) == string.upper(snowflake_parts.database) then
+            -- Same database, safe to query
+            Database.get_models(snowflake_parts.schema, function(models)
+              callback({
+                items = map_models_to_blink_completion_items(models, snowflake_parts.schema),
+                is_incomplete_forward = false,
+                is_incomplete_backward = false,
+              })
+            end)
+          else
+            -- Different database - avoid cross-database query that might fail
+            print("cmp-dbee: Cross-database reference detected, skipping to prevent errors")
+            callback({
+              items = {
+                create_blink_completion_item(
+                  "-- Cross-database query",
+                  1, -- Text kind
+                  "Use database " .. snowflake_parts.database .. " first, then query " .. snowflake_parts.schema,
+                  50
+                )
+              },
+              is_incomplete_forward = false,
+              is_incomplete_backward = false,
+            })
+          end
+        else
+          -- Single part before dot, treat as database or schema name
+          Database.get_models(re_references, function(models)
+            callback({
+              items = map_models_to_blink_completion_items(models, re_references),
+              is_incomplete_forward = false,
+              is_incomplete_backward = false,
+            })
+          end)
+        end
       else
         -- For other databases (PostgreSQL, MySQL, etc.), try column completion first
         Database.get_column_completion("public", re_references, function(columns)

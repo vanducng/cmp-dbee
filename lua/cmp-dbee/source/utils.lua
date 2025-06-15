@@ -29,4 +29,19 @@ function M:captured_schema(line)
   return cursor_before_line:match("[%s%(]+([%w_]+)%.$")
 end
 
+--- Capture three-part Snowflake naming: database.schema.table
+--- @param line? string The line to parse
+--- @return table|nil Returns {database=string, schema=string} or nil
+function M:captured_snowflake_parts(line)
+  local cursor_before_line = line or self:get_cursor_before_line()
+  
+  -- Match patterns like "database.schema." or "from database.schema."
+  local database, schema = cursor_before_line:match("[%s%(]+([%w_]+)%.([%w_]+)%.$")
+  if database and schema then
+    return {database = database, schema = schema}
+  end
+  
+  return nil
+end
+
 return M
