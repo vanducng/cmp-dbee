@@ -118,6 +118,18 @@ end
 --- Get all references (cte, schemas, table, alias etc) based on the cursor position.
 --- @return ReferencesAtCursor|nil A table containing CTE references and schema, table, and alias references, or nil if no node is found.
 function Parser.get_references_at_cursor()
+  -- Early return if completion is disabled for current connection
+  local database_ok, database = pcall(require, "cmp-dbee.database")
+  if database_ok then
+    local current_connection = database.get_current_connection()
+    if current_connection then
+      local filter_ok, filter = pcall(require, "cmp-dbee.database.filter")
+      if filter_ok and not filter.is_completion_enabled(current_connection) then
+        return nil -- Skip expensive treesitter parsing
+      end
+    end
+  end
+  
   local current_node = Parser.get_cursor_node()
   if not current_node then
     return nil
