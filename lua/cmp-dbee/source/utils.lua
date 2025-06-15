@@ -3,18 +3,6 @@ local M = {}
 --- Get the text of the line before the cursor
 ---@return string The text of the line before the cursor
 function M:get_cursor_before_line()
-  -- Early return if completion is disabled for current connection
-  local database_ok, database = pcall(require, "cmp-dbee.database")
-  if database_ok then
-    local current_connection = database.get_current_connection()
-    if current_connection then
-      local filter_ok, filter = pcall(require, "cmp-dbee.database.filter")
-      if filter_ok and not filter.is_completion_enabled(current_connection) then
-        return "" -- Return empty string to avoid processing
-      end
-    end
-  end
-  
   local line_number = vim.fn.line(".")
   local col_number = vim.fn.col(".")
 
@@ -37,18 +25,6 @@ end
 ---@param line? string The line to get the schema from
 ---@return any
 function M:captured_schema(line)
-  -- ALWAYS check if completion is disabled, regardless of line parameter
-  local database_ok, database = pcall(require, "cmp-dbee.database")
-  if database_ok then
-    local current_connection = database.get_current_connection()
-    if current_connection then
-      local filter_ok, filter = pcall(require, "cmp-dbee.database.filter")
-      if filter_ok and not filter.is_completion_enabled(current_connection) then
-        return nil -- Skip processing entirely
-      end
-    end
-  end
-  
   local cursor_before_line = line or self:get_cursor_before_line()
   -- Match word boundaries: space, parenthesis, or start of string
   return cursor_before_line:match("[%s%(]*([%w_]+)%.$")
@@ -58,18 +34,6 @@ end
 --- @param line? string The line to parse
 --- @return table|nil Returns {database=string, schema=string} or nil
 function M:captured_snowflake_parts(line)
-  -- Early return if completion is disabled for current connection
-  local database_ok, database = pcall(require, "cmp-dbee.database")
-  if database_ok then
-    local current_connection = database.get_current_connection()
-    if current_connection then
-      local filter_ok, filter = pcall(require, "cmp-dbee.database.filter")
-      if filter_ok and not filter.is_completion_enabled(current_connection) then
-        return nil -- Skip processing
-      end
-    end
-  end
-  
   local cursor_before_line = line or self:get_cursor_before_line()
   
   -- Match patterns like "database.schema." or "from database.schema."
