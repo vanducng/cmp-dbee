@@ -121,6 +121,9 @@ Source.complete = function(_, _, callback)
     local ts_references = Parser.get_references_at_cursor()
     local items = {}
 
+    -- Get current connection for strategy selection
+    local current_connection = Database.get_current_connection()
+
     if re_references then
       if ts_references and ts_references.schema_table_references then
         for _, ref in ipairs(ts_references.schema_table_references) do
@@ -136,12 +139,57 @@ Source.complete = function(_, _, callback)
         end
       end
 
-      Database.get_models(re_references, function(models)
-        callback {
-          items = map_models_to_completion_items(models, re_references),
-          isIncomplete = false,
-        }
-      end)
+      -- Use strategy pattern for database-specific completion
+      local strategy = require("cmp-dbee.database.strategy")
+      local completion_context = strategy.parse_completion_context(line, current_connection)
+      
+      if completion_context then
+        -- Use database-specific strategy
+        completion_context.strategy:get_qualified_completions(completion_context, function(results)
+          if completion_context.type == "column" then
+            callback {
+              items = map_columns_to_completion_items(results, completion_context.parts.schema or "public", completion_context.parts.table),
+              isIncomplete = false,
+            }
+          elseif completion_context.type == "table" then
+            callback {
+              items = map_models_to_completion_items(results, completion_context.parts.schema or completion_context.parts.database),
+              isIncomplete = false,
+            }
+          else
+            -- Handle special results like guidance messages
+            if type(results[1]) == "table" and results[1].label then
+              -- Convert to nvim-cmp format
+              local guidance_items = {}
+              for _, item in ipairs(results) do
+                table.insert(guidance_items, create_completion_item(
+                  item.label,
+                  cmp.lsp.CompletionItemKind.Text,
+                  item.documentation and item.documentation.value or item.detail or "",
+                  50
+                ))
+              end
+              callback {
+                items = guidance_items,
+                isIncomplete = false,
+              }
+            else
+              callback {
+                items = map_models_to_completion_items(results, re_references),
+                isIncomplete = false,
+              }
+            end
+          end
+        end)
+      else
+        -- Fallback to legacy logic
+        Database.get_models(re_references, function(models)
+          callback {
+            items = map_models_to_completion_items(models, re_references),
+            isIncomplete = false,
+          }
+        end)
+      end
       return
     end
 

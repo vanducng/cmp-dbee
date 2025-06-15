@@ -119,6 +119,9 @@ function BlinkDbeeProvider:get_completions(context, callback)
     local ts_references = Parser.get_references_at_cursor()
     local items = {}
 
+    -- Get current connection for strategy selection
+    local current_connection = Database.get_current_connection()
+    
     if re_references then
       -- First check if TreeSitter found specific table references with aliases
       if ts_references and ts_references.schema_table_references then
@@ -136,55 +139,69 @@ function BlinkDbeeProvider:get_completions(context, callback)
         end
       end
       
-      -- If no alias match, try to treat re_references as a direct table name
-      -- This handles cases like "django_migrations." where it's a direct table reference
+      -- Use the new strategy pattern for database-specific completion
+      local strategy = require("cmp-dbee.database.strategy")
+      local completion_context = strategy.parse_completion_context(line, current_connection)
       
-      -- First check if this is a database reference (for Snowflake cross-database queries)
-      local current_connection = Database.get_current_connection()
-      local is_snowflake = current_connection and current_connection.type == "snowflake"
-      
-      if is_snowflake then
-        -- For Snowflake, handle three-part naming: database.schema.table
-        local snowflake_parts = Utils:captured_snowflake_parts(line)
+      if completion_context then
+        -- Use database-specific strategy
+        print("cmp-dbee: Using " .. (current_connection.type or "default") .. " strategy for " .. completion_context.type .. " completion")
         
-        if snowflake_parts then
-          -- User typed "database.schema.", show tables from that schema
-          print("cmp-dbee: Snowflake three-part reference detected: " .. snowflake_parts.database .. "." .. snowflake_parts.schema)
-          
-          -- For cross-database queries in Snowflake, we need to be very careful
-          -- Instead of making a potentially failing query, return a helpful message
-          -- or try to use the current database structure
-          
-          -- Check if the referenced database matches current connection database
-          local current_db = current_connection.url and current_connection.url:match("database=([^&]+)")
-          
-          if current_db and string.upper(current_db) == string.upper(snowflake_parts.database) then
-            -- Same database, safe to query
-            Database.get_models(snowflake_parts.schema, function(models)
-              callback({
-                items = map_models_to_blink_completion_items(models, snowflake_parts.schema),
-                is_incomplete_forward = false,
-                is_incomplete_backward = false,
-              })
-            end)
-          else
-            -- Different database - avoid cross-database query that might fail
-            print("cmp-dbee: Cross-database reference detected, skipping to prevent errors")
+        completion_context.strategy:get_qualified_completions(completion_context, function(results)
+          if completion_context.type == "column" then
             callback({
-              items = {
-                create_blink_completion_item(
-                  "-- Cross-database query",
-                  1, -- Text kind
-                  "Use database " .. snowflake_parts.database .. " first, then query " .. snowflake_parts.schema,
-                  50
-                )
-              },
+              items = map_columns_to_blink_completion_items(results, completion_context.parts.schema or "public", completion_context.parts.table),
               is_incomplete_forward = false,
               is_incomplete_backward = false,
             })
+          elseif completion_context.type == "table" then
+            callback({
+              items = map_models_to_blink_completion_items(results, completion_context.parts.schema or completion_context.parts.database),
+              is_incomplete_forward = false,
+              is_incomplete_backward = false,
+            })
+          else
+            -- Handle special results like guidance messages
+            if type(results[1]) == "table" and results[1].label then
+              callback({
+                items = results,
+                is_incomplete_forward = false,
+                is_incomplete_backward = false,
+              })
+            else
+              callback({
+                items = map_models_to_blink_completion_items(results, re_references),
+                is_incomplete_forward = false,
+                is_incomplete_backward = false,
+              })
+            end
           end
+        end)
+        return
+      else
+        -- Fallback to legacy logic for backward compatibility
+        if current_connection and current_connection.type == "postgres" or current_connection.type == "postgresql" then
+          -- PostgreSQL: try column completion first
+          Database.get_column_completion("public", re_references, function(columns)
+            if #columns > 0 then
+              callback({
+                items = map_columns_to_blink_completion_items(columns, "public", re_references),
+                is_incomplete_forward = false,
+                is_incomplete_backward = false,
+              })
+              return
+            else
+              Database.get_models(re_references, function(models)
+                callback({
+                  items = map_models_to_blink_completion_items(models, re_references),
+                  is_incomplete_forward = false,
+                  is_incomplete_backward = false,
+                })
+              end)
+            end
+          end)
         else
-          -- Single part before dot, treat as database or schema name
+          -- Other databases: try schema/table completion
           Database.get_models(re_references, function(models)
             callback({
               items = map_models_to_blink_completion_items(models, re_references),
@@ -193,28 +210,6 @@ function BlinkDbeeProvider:get_completions(context, callback)
             })
           end)
         end
-      else
-        -- For other databases (PostgreSQL, MySQL, etc.), try column completion first
-        Database.get_column_completion("public", re_references, function(columns)
-          if #columns > 0 then
-            -- Found columns for this table, return them
-            callback({
-              items = map_columns_to_blink_completion_items(columns, "public", re_references),
-              is_incomplete_forward = false,
-              is_incomplete_backward = false,
-            })
-            return
-          else
-            -- No columns found, fall back to schema/table completion
-            Database.get_models(re_references, function(models)
-              callback({
-                items = map_models_to_blink_completion_items(models, re_references),
-                is_incomplete_forward = false,
-                is_incomplete_backward = false,
-              })
-            end)
-          end
-        end)
       end
       return
     end
