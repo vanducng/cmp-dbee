@@ -47,6 +47,36 @@ Database.cache_expiry_s = 10 -- seconds
 Database.cache_last_updated = {}
 Database._listeners_registered = false -- Track if event listeners are registered
 
+--- Clear the cache for the current connection.
+function Database.clear_cache()
+  local connection_id = Database.get_current_connection()
+  if connection_id then
+    Database.cache[connection_id.id] = nil -- Clear the cache for this connection
+    Database.column_cache[connection_id.id] = nil -- Clear the column cache for this connection
+  end
+end
+
+--- Safely register event listeners for cache invalidation
+function Database.ensure_event_listeners()
+  if Database._listeners_registered then
+    return
+  end
+  
+  local core = get_dbee_core()
+  if not core then
+    return
+  end
+  
+  local ok = pcall(function()
+    core.register_event_listener("current_connection_changed", Database.clear_cache)
+    core.register_event_listener("database_selected", Database.clear_cache)
+  end)
+  
+  if ok then
+    Database._listeners_registered = true
+  end
+end
+
 --- Get the current connection ID.
 --- @return ConnectionParams|nil connection_id The current connection ID or nil if not available.
 function Database.get_current_connection()
@@ -82,7 +112,7 @@ end
 --- is of type DBStructure[].
 --- @param callback Callback Callback function to return the database structure (cached or not).
 function Database.get_db_structure(callback)
-  ensure_event_listeners() -- Ensure event listeners are registered
+  Database.ensure_event_listeners() -- Ensure event listeners are registered
   
   local connection_id = Database.get_current_connection()
   if connection_id == nil then
@@ -122,7 +152,7 @@ end
 --- @param schema string The schema name.
 --- @param callback Callback Callback function to return the models.
 function Database.get_models(schema, callback)
-  ensure_event_listeners() -- Ensure event listeners are registered
+  Database.ensure_event_listeners() -- Ensure event listeners are registered
   
   local connection_id = Database.get_current_connection()
   if not connection_id then
@@ -154,7 +184,7 @@ end
 --- @param model string The model name.
 --- @param callback Callback Callback function to return the columns.
 function Database.get_column_completion(schema, model, callback)
-  ensure_event_listeners() -- Ensure event listeners are registered
+  Database.ensure_event_listeners() -- Ensure event listeners are registered
   
   local connection_id = Database.get_current_connection()
   if not connection_id then
@@ -199,36 +229,6 @@ function Database.get_column_completion(schema, model, callback)
     Database.column_cache[connection_id.id][schema][model] = columns -- Cache the fetched columns
     callback(columns)
   end, 0)
-end
-
---- Clear the cache for the current connection.
-local function clear_cache()
-  local connection_id = Database.get_current_connection()
-  if connection_id then
-    Database.cache[connection_id.id] = nil -- Clear the cache for this connection
-    Database.column_cache[connection_id.id] = nil -- Clear the column cache for this connection
-  end
-end
-
---- Safely register event listeners for cache invalidation
-local function ensure_event_listeners()
-  if Database._listeners_registered then
-    return
-  end
-  
-  local core = get_dbee_core()
-  if not core then
-    return
-  end
-  
-  local ok = pcall(function()
-    core.register_event_listener("current_connection_changed", clear_cache)
-    core.register_event_listener("database_selected", clear_cache)
-  end)
-  
-  if ok then
-    Database._listeners_registered = true
-  end
 end
 
 return Database
