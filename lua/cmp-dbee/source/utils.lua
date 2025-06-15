@@ -37,14 +37,14 @@ end
 ---@param line? string The line to get the schema from
 ---@return any
 function M:captured_schema(line)
-  -- Early return if completion is disabled for current connection
+  -- ALWAYS check if completion is disabled, regardless of line parameter
   local database_ok, database = pcall(require, "cmp-dbee.database")
   if database_ok then
     local current_connection = database.get_current_connection()
     if current_connection then
       local filter_ok, filter = pcall(require, "cmp-dbee.database.filter")
       if filter_ok and not filter.is_completion_enabled(current_connection) then
-        return nil -- Skip processing
+        return nil -- Skip processing entirely
       end
     end
   end
