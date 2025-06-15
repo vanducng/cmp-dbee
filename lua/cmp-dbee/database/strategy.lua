@@ -275,7 +275,7 @@ end
 
 --- Strategy factory
 local strategies = {
-  snowflake = SnowflakeStrategy,
+  -- snowflake = SnowflakeStrategy, -- Disabled
   postgres = PostgresStrategy,
   postgresql = PostgresStrategy, -- Alternative name
   mysql = MySQLStrategy,
@@ -288,6 +288,11 @@ local strategies = {
 function M.get_strategy(connection)
   if not connection or not connection.type then
     return DatabaseStrategy -- Default strategy
+  end
+  
+  -- Disable Snowflake completion completely
+  if string.lower(connection.type) == "snowflake" then
+    return setmetatable({}, {__index = DatabaseStrategy}) -- Use default (no completion)
   end
   
   local strategy_class = strategies[string.lower(connection.type)]
@@ -303,6 +308,11 @@ end
 ---@param connection table Database connection info
 ---@return table|nil context
 function M.parse_completion_context(line, connection)
+  -- Disable Snowflake completion completely
+  if connection and string.lower(connection.type or "") == "snowflake" then
+    return nil
+  end
+  
   local strategy = M.get_strategy(connection)
   local convention = strategy:get_naming_convention()
   

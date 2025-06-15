@@ -7,6 +7,7 @@ local defaults = {
   lazy_column_completion = false, -- Whether to enable lazy column completion
   polling_interval = 10000, -- Default polling interval in milliseconds
   enable_change_detection = true, -- Enable change detection by default
+  disabled_databases = {}, -- List of database types to disable completion for
 }
 
 -- Function to set up configuration

@@ -113,6 +113,17 @@ end
 --- @param context table The completion context from blink.cmp
 --- @param callback function The callback function to return the completion items.
 function BlinkDbeeProvider:get_completions(context, callback)
+  -- Early return for Snowflake connections to avoid any processing
+  local current_connection = Database.get_current_connection()
+  if current_connection and string.lower(current_connection.type or "") == "snowflake" then
+    callback({
+      items = {},
+      is_incomplete_forward = false,
+      is_incomplete_backward = false,
+    })
+    return
+  end
+  
   Database.get_db_structure(function(db_structure)
     local line = Utils:get_cursor_before_line()
     local re_references = Utils:captured_schema(line)
@@ -272,7 +283,17 @@ end
 --- @param context table The completion context from blink.cmp
 --- @return boolean True if the provider is available, false otherwise.
 function BlinkDbeeProvider:is_available(context)
-  return Database.is_available()
+  if not Database.is_available() then
+    return false
+  end
+  
+  -- Disable for Snowflake connections
+  local current_connection = Database.get_current_connection()
+  if current_connection and string.lower(current_connection.type or "") == "snowflake" then
+    return false
+  end
+  
+  return true
 end
 
 --- Get the trigger characters for the provider

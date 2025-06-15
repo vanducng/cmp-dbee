@@ -119,6 +119,12 @@ function Database.get_db_structure(callback)
     callback {}
     return
   end
+  
+  -- Skip for Snowflake connections
+  if string.lower(connection_id.type or "") == "snowflake" then
+    callback {}
+    return
+  end
 
   if
     Database.cache[connection_id.id]
@@ -156,6 +162,12 @@ function Database.get_models(schema, callback)
   
   local connection_id = Database.get_current_connection()
   if not connection_id then
+    callback {}
+    return
+  end
+  
+  -- Skip for Snowflake connections
+  if string.lower(connection_id.type or "") == "snowflake" then
     callback {}
     return
   end
@@ -197,6 +209,12 @@ function Database.get_column_completion(schema, model, callback)
   
   local connection_id = Database.get_current_connection()
   if not connection_id then
+    callback {}
+    return
+  end
+  
+  -- Skip for Snowflake connections
+  if string.lower(connection_id.type or "") == "snowflake" then
     callback {}
     return
   end
