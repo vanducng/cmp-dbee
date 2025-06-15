@@ -153,47 +153,29 @@ function SnowflakeStrategy:get_qualified_completions(context, callback)
       print("cmp-dbee: Snowflake querying tables in " .. database .. "." .. schema)
       Database.get_models(schema, callback)
     else
-      -- Cross-database reference - provide tables with guidance
+      -- Cross-database reference - provide only guidance (no fake suggestions) 
       print("cmp-dbee: Cross-database table reference detected: " .. database .. "." .. schema)
       
-      local snowflake_queries = require("cmp-dbee.database.snowflake_queries")
-      snowflake_queries.get_tables_from_database_schema(database, schema, context.current_connection.id, function(tables)
-        local guidance_items = {
-          {
-            label = "-- Switch to " .. database .. " database first",
-            kind = 1, -- Text
-            detail = "Cross-database table query",
-            documentation = {
-              kind = "markdown",
-              value = "Use `USE DATABASE " .. database .. ";` first, then query tables in " .. schema .. " schema."
-            }
-          },
-          {
-            label = "USE DATABASE " .. database .. ";",
-            kind = 15, -- Snippet
-            detail = "Switch database",
-            documentation = {
-              kind = "markdown", 
-              value = "Execute this to switch to the " .. database .. " database."
-            }
+      callback({
+        {
+          label = "-- Switch to " .. database .. " database first",
+          kind = 1, -- Text
+          detail = "Cross-database table query",
+          documentation = {
+            kind = "markdown",
+            value = "Cross-database queries are not supported. Use `USE DATABASE " .. database .. ";` to switch to " .. database .. " database first."
+          }
+        },
+        {
+          label = "USE DATABASE " .. database .. ";",
+          kind = 15, -- Snippet
+          detail = "Switch database",
+          documentation = {
+            kind = "markdown", 
+            value = "Execute this command to switch to the " .. database .. " database, then you can access " .. schema .. " schema tables."
           }
         }
-        
-        -- Add table suggestions
-        for _, table_info in ipairs(tables) do
-          table.insert(guidance_items, {
-            label = table_info.name,
-            kind = 3, -- Function (represents table)
-            detail = "Table in " .. database .. "." .. schema,
-            documentation = {
-              kind = "markdown",
-              value = "Table `" .. table_info.name .. "` in " .. database .. "." .. schema .. " (switch database first)"
-            }
-          })
-        end
-        
-        callback(guidance_items)
-      end)
+      })
     end
   elseif context.type == "schema" and context.parts and context.parts.database then
     -- Two-part reference: database.schema
@@ -203,47 +185,29 @@ function SnowflakeStrategy:get_qualified_completions(context, callback)
       -- Same database - get actual schemas
       Database.get_models(database, callback)
     else
-      -- Cross-database - provide schemas with guidance
+      -- Cross-database - provide only guidance (no fake suggestions)
       print("cmp-dbee: Cross-database schema reference detected: " .. database)
       
-      local snowflake_queries = require("cmp-dbee.database.snowflake_queries")
-      snowflake_queries.get_schemas_from_database(database, context.current_connection.id, function(schemas)
-        local guidance_items = {
-          {
-            label = "-- Switch to " .. database .. " database first",
-            kind = 1, -- Text
-            detail = "Cross-database schema query",
-            documentation = {
-              kind = "markdown",
-              value = "Use `USE DATABASE " .. database .. ";` to access schemas in " .. database
-            }
-          },
-          {
-            label = "USE DATABASE " .. database .. ";",
-            kind = 15, -- Snippet
-            detail = "Switch database",
-            documentation = {
-              kind = "markdown",
-              value = "Execute this to switch to the " .. database .. " database."
-            }
+      callback({
+        {
+          label = "-- Switch to " .. database .. " database first",
+          kind = 1, -- Text
+          detail = "Cross-database schema query",
+          documentation = {
+            kind = "markdown",
+            value = "Cross-database queries are not supported. Use `USE DATABASE " .. database .. ";` to switch to " .. database .. " database first."
+          }
+        },
+        {
+          label = "USE DATABASE " .. database .. ";",
+          kind = 15, -- Snippet
+          detail = "Switch database",
+          documentation = {
+            kind = "markdown",
+            value = "Execute this command to switch to the " .. database .. " database, then you can access its schemas."
           }
         }
-        
-        -- Add schema suggestions
-        for _, schema_info in ipairs(schemas) do
-          table.insert(guidance_items, {
-            label = schema_info.name,
-            kind = 9, -- Module
-            detail = "Schema in " .. database,
-            documentation = {
-              kind = "markdown",
-              value = "Schema `" .. schema_info.name .. "` in database " .. database .. " (switch database first)"
-            }
-          })
-        end
-        
-        callback(guidance_items)
-      end)
+      })
     end
   else
     -- Single part or unsupported
