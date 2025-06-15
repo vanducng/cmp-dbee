@@ -115,13 +115,6 @@ end
 --- Completion function for the Dbee source
 --- @param callback Callback The callback function to return the completion items.
 Source.complete = function(_, _, callback)
-  -- Early return for Snowflake connections to avoid any processing
-  local current_connection = Database.get_current_connection()
-  if current_connection and string.lower(current_connection.type or "") == "snowflake" then
-    callback { items = {}, isIncomplete = false }
-    return
-  end
-  
   Database.get_db_structure(function(db_structure)
     local line = Utils:get_cursor_before_line()
     local re_references = Utils:captured_schema(line)
@@ -266,13 +259,10 @@ Source.is_available = function()
     return false
   end
   
-  -- Disable for Snowflake connections
+  -- Check if completion is enabled for this database type
   local current_connection = Database.get_current_connection()
-  if current_connection and string.lower(current_connection.type or "") == "snowflake" then
-    return false
-  end
-  
-  return true
+  local filter = require("cmp-dbee.database.filter")
+  return filter.is_completion_enabled(current_connection)
 end
 
 --- Get the trigger characters for the source

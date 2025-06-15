@@ -8,6 +8,11 @@ local defaults = {
   polling_interval = 10000, -- Default polling interval in milliseconds
   enable_change_detection = true, -- Enable change detection by default
   disabled_databases = {}, -- List of database types to disable completion for
+  database_overrides = {}, -- Database-specific configuration overrides
+  debug = {
+    enabled = false, -- Enable debug logging
+    log_disabled_connections = true, -- Log when completion is disabled
+  },
 }
 
 -- Function to set up configuration

@@ -61,6 +61,27 @@ function DatabaseStrategy:get_qualified_completions(context, callback)
   callback({}) -- Default: no results
 end
 
+--- NoOp strategy for disabled databases
+---@class NoOpStrategy : DatabaseStrategy
+local NoOpStrategy = setmetatable({}, {__index = DatabaseStrategy})
+NoOpStrategy.__index = NoOpStrategy
+
+function NoOpStrategy:get_naming_convention()
+  return {
+    supports_cross_database = false,
+    max_parts = 0,
+    pattern = "disabled"
+  }
+end
+
+function NoOpStrategy:parse_qualified_name(qualified_name)
+  return nil -- Never parse anything
+end
+
+function NoOpStrategy:get_qualified_completions(context, callback)
+  callback({}) -- Always return empty results
+end
+
 --- Snowflake-specific strategy
 ---@class SnowflakeStrategy : DatabaseStrategy
 local SnowflakeStrategy = setmetatable({}, {__index = DatabaseStrategy})
@@ -287,12 +308,13 @@ local strategies = {
 ---@return DatabaseStrategy strategy
 function M.get_strategy(connection)
   if not connection or not connection.type then
-    return DatabaseStrategy -- Default strategy
+    return setmetatable({}, {__index = DatabaseStrategy}) -- Default strategy
   end
   
-  -- Disable Snowflake completion completely
-  if string.lower(connection.type) == "snowflake" then
-    return setmetatable({}, {__index = DatabaseStrategy}) -- Use default (no completion)
+  -- Check if completion is disabled for this database type
+  local filter = require("cmp-dbee.database.filter")
+  if not filter.is_completion_enabled(connection) then
+    return setmetatable({}, {__index = NoOpStrategy})
   end
   
   local strategy_class = strategies[string.lower(connection.type)]
@@ -308,8 +330,9 @@ end
 ---@param connection table Database connection info
 ---@return table|nil context
 function M.parse_completion_context(line, connection)
-  -- Disable Snowflake completion completely
-  if connection and string.lower(connection.type or "") == "snowflake" then
+  -- Check if completion is disabled for this database type
+  local filter = require("cmp-dbee.database.filter")
+  if not filter.is_completion_enabled(connection) then
     return nil
   end
   

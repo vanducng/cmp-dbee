@@ -120,8 +120,9 @@ function Database.get_db_structure(callback)
     return
   end
   
-  -- Skip for Snowflake connections
-  if string.lower(connection_id.type or "") == "snowflake" then
+  -- Check if completion is enabled for this database type
+  local filter = require("cmp-dbee.database.filter")
+  if not filter.is_completion_enabled(connection_id) then
     callback {}
     return
   end
@@ -166,8 +167,9 @@ function Database.get_models(schema, callback)
     return
   end
   
-  -- Skip for Snowflake connections
-  if string.lower(connection_id.type or "") == "snowflake" then
+  -- Check if completion is enabled for this database type
+  local filter = require("cmp-dbee.database.filter")
+  if not filter.is_completion_enabled(connection_id) then
     callback {}
     return
   end
@@ -213,8 +215,9 @@ function Database.get_column_completion(schema, model, callback)
     return
   end
   
-  -- Skip for Snowflake connections
-  if string.lower(connection_id.type or "") == "snowflake" then
+  -- Check if completion is enabled for this database type
+  local filter = require("cmp-dbee.database.filter")
+  if not filter.is_completion_enabled(connection_id) then
     callback {}
     return
   end
