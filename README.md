@@ -9,6 +9,9 @@
   - [Usage](#usage)
     - [Suggestions](#suggestions)
   - [Installation](#installation)
+  - [Configuration](#configuration)
+    - [Disabling Completion for Specific Databases](#disabling-completion-for-specific-databases)
+    - [Advanced Configuration](#advanced-configuration)
   <!--toc:end-->
 
 Autocompletion plugin for [nvim-dbee](https://github.com/kndndrj/nvim-dbee/) database client.
@@ -89,3 +92,42 @@ leafs provides columns. This might change in the future.
       end,
    }
 ```
+
+## Configuration
+
+cmp-dbee supports configuration to customize behavior for different database types.
+
+### Disabling Completion for Specific Databases
+
+You can disable completion for specific database types (useful for large databases or to prevent lag):
+
+```lua
+require("cmp-dbee").setup({
+  -- Disable completion for Snowflake to prevent lag
+  disabled_databases = { "snowflake" },
+})
+```
+
+### Advanced Configuration
+
+For more control, use database-specific overrides:
+
+```lua
+require("cmp-dbee").setup({
+  database_overrides = {
+    snowflake = {
+      completion_enabled = false,  -- Disable completion
+      execution_enabled = true,    -- Still allow query execution
+    },
+    bigquery = {
+      completion_enabled = false,
+    },
+  },
+  debug = {
+    enabled = false,
+    log_disabled_connections = true,
+  },
+})
+```
+
+See [CONFIGURATION.md](docs/CONFIGURATION.md) for detailed configuration options.
