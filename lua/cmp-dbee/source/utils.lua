@@ -26,7 +26,8 @@ end
 ---@return any
 function M:captured_schema(line)
   local cursor_before_line = line or self:get_cursor_before_line()
-  return cursor_before_line:match("[%s%(]+([%w_]+)%.$")
+  -- Match word boundaries: space, parenthesis, or start of string
+  return cursor_before_line:match("[%s%(]*([%w_]+)%.$")
 end
 
 --- Capture three-part Snowflake naming: database.schema.table
@@ -36,7 +37,8 @@ function M:captured_snowflake_parts(line)
   local cursor_before_line = line or self:get_cursor_before_line()
   
   -- Match patterns like "database.schema." or "from database.schema."
-  local database, schema = cursor_before_line:match("[%s%(]+([%w_]+)%.([%w_]+)%.$")
+  -- Use * instead of + to allow zero or more spaces
+  local database, schema = cursor_before_line:match("[%s%(]*([%w_]+)%.([%w_]+)%.$")
   if database and schema then
     return {database = database, schema = schema}
   end

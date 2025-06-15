@@ -294,7 +294,8 @@ function M.parse_completion_context(line, connection)
   local convention = strategy:get_naming_convention()
   
   -- Try to match qualified references ending with dot
-  local qualified_match = line:match("[%s%(]+([%w_.]+)%.$")
+  -- Use * instead of + to allow zero or more spaces (handles start of string)
+  local qualified_match = line:match("[%s%(]*([%w_.]+)%.$")
   if not qualified_match then
     return nil
   end
