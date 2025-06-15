@@ -80,7 +80,9 @@ function SnowflakeStrategy:parse_qualified_name(qualified_name)
     table.insert(parts, part)
   end
   
-  if #parts == 3 then
+  if #parts == 4 then
+    return {database = parts[1], schema = parts[2], table = parts[3], column = parts[4]}
+  elseif #parts == 3 then
     return {database = parts[1], schema = parts[2], table = parts[3]}
   elseif #parts == 2 then
     return {database = parts[1], schema = parts[2]}
@@ -107,7 +109,41 @@ end
 function SnowflakeStrategy:get_qualified_completions(context, callback)
   local Database = require("cmp-dbee.database")
   
-  if context.type == "table" and context.parts and context.parts.database and context.parts.schema then
+  if context.type == "column" and context.parts and context.parts.database and context.parts.schema and context.parts.table then
+    -- Four-part reference: database.schema.table.column
+    local database = context.parts.database
+    local schema = context.parts.schema
+    local table = context.parts.table
+    
+    if self:is_cross_database_safe(database, context.current_connection) then
+      -- Safe to query - same database
+      print("cmp-dbee: Snowflake querying columns in " .. database .. "." .. schema .. "." .. table)
+      Database.get_column_completion(schema, table, callback)
+    else
+      -- Cross-database reference - provide guidance instead of failing query
+      print("cmp-dbee: Cross-database column reference detected: " .. database .. "." .. schema .. "." .. table)
+      callback({
+        {
+          label = "-- Switch to " .. database .. " database first",
+          kind = 1, -- Text
+          detail = "Cross-database column query",
+          documentation = {
+            kind = "markdown",
+            value = "Use `USE DATABASE " .. database .. ";` first, then access columns from " .. schema .. "." .. table
+          }
+        },
+        {
+          label = "USE DATABASE " .. database .. ";",
+          kind = 15, -- Snippet
+          detail = "Switch database",
+          documentation = {
+            kind = "markdown", 
+            value = "Execute this to switch to the " .. database .. " database, then you can access " .. schema .. "." .. table .. " columns."
+          }
+        }
+      })
+    end
+  elseif context.type == "table" and context.parts and context.parts.database and context.parts.schema then
     -- Three-part reference: database.schema.table
     local database = context.parts.database
     local schema = context.parts.schema
@@ -118,15 +154,15 @@ function SnowflakeStrategy:get_qualified_completions(context, callback)
       Database.get_models(schema, callback)
     else
       -- Cross-database reference - provide guidance
-      print("cmp-dbee: Cross-database reference detected: " .. database .. "." .. schema)
+      print("cmp-dbee: Cross-database table reference detected: " .. database .. "." .. schema)
       callback({
         {
           label = "-- Switch to " .. database .. " database first",
           kind = 1, -- Text
-          detail = "Cross-database query",
+          detail = "Cross-database table query",
           documentation = {
             kind = "markdown",
-            value = "Use `USE DATABASE " .. database .. ";` first, then query this schema."
+            value = "Use `USE DATABASE " .. database .. ";` first, then query tables in " .. schema .. " schema."
           }
         },
         {
@@ -142,7 +178,24 @@ function SnowflakeStrategy:get_qualified_completions(context, callback)
     end
   elseif context.type == "schema" and context.parts and context.parts.database then
     -- Two-part reference: database.schema
-    Database.get_models(context.parts.database, callback)
+    local database = context.parts.database
+    
+    if self:is_cross_database_safe(database, context.current_connection) then
+      Database.get_models(database, callback)
+    else
+      print("cmp-dbee: Cross-database schema reference detected: " .. database)
+      callback({
+        {
+          label = "-- Switch to " .. database .. " database first",
+          kind = 1, -- Text
+          detail = "Cross-database schema query",
+          documentation = {
+            kind = "markdown",
+            value = "Use `USE DATABASE " .. database .. ";` to access schemas in " .. database
+          }
+        }
+      })
+    end
   else
     -- Single part or unsupported
     callback({})
@@ -261,7 +314,9 @@ function M.parse_completion_context(line, connection)
   
   -- Determine completion type based on number of parts and database convention
   if connection.type == "snowflake" then
-    if parts.database and parts.schema then
+    if parts.database and parts.schema and parts.table then
+      context.type = "column" -- database.schema.table. -> columns
+    elseif parts.database and parts.schema then
       context.type = "table" -- database.schema. -> tables
     elseif parts.database then
       context.type = "schema" -- database. -> schemas
