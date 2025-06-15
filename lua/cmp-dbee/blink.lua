@@ -138,26 +138,45 @@ function BlinkDbeeProvider:get_completions(context, callback)
       
       -- If no alias match, try to treat re_references as a direct table name
       -- This handles cases like "django_migrations." where it's a direct table reference
-      Database.get_column_completion("public", re_references, function(columns)
-        if #columns > 0 then
-          -- Found columns for this table, return them
+      
+      -- First check if this is a database reference (for Snowflake cross-database queries)
+      local current_connection = Database.get_current_connection()
+      local is_snowflake = current_connection and current_connection.type == "snowflake"
+      
+      if is_snowflake then
+        -- For Snowflake, database.schema.table syntax is common
+        -- When user types "database.", show schemas from that database
+        -- But we need to be careful about cross-database queries
+        Database.get_models(re_references, function(models)
           callback({
-            items = map_columns_to_blink_completion_items(columns, "public", re_references),
+            items = map_models_to_blink_completion_items(models, re_references),
             is_incomplete_forward = false,
             is_incomplete_backward = false,
           })
-          return
-        else
-          -- No columns found, fall back to schema/table completion
-          Database.get_models(re_references, function(models)
+        end)
+      else
+        -- For other databases (PostgreSQL, MySQL, etc.), try column completion first
+        Database.get_column_completion("public", re_references, function(columns)
+          if #columns > 0 then
+            -- Found columns for this table, return them
             callback({
-              items = map_models_to_blink_completion_items(models, re_references),
+              items = map_columns_to_blink_completion_items(columns, "public", re_references),
               is_incomplete_forward = false,
               is_incomplete_backward = false,
             })
-          end)
-        end
-      end)
+            return
+          else
+            -- No columns found, fall back to schema/table completion
+            Database.get_models(re_references, function(models)
+              callback({
+                items = map_models_to_blink_completion_items(models, re_references),
+                is_incomplete_forward = false,
+                is_incomplete_backward = false,
+              })
+            end)
+          end
+        end)
+      end
       return
     end
 

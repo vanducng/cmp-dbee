@@ -160,13 +160,15 @@ function Database.get_models(schema, callback)
     return
   end
 
-  Database.get_db_structure(function(structure)
-    if not structure then
-      callback {}
-      return
-    end
+  -- Add error handling for database operations
+  local ok, result = pcall(function()
+    Database.get_db_structure(function(structure)
+      if not structure then
+        callback {}
+        return
+      end
 
-    local models = {}
+      local models = {}
     for _, s in ipairs(structure) do
       if s.name == schema then
         for _, model in ipairs(s.children or {}) do
@@ -176,7 +178,14 @@ function Database.get_models(schema, callback)
     end
 
     callback(models)
+    end)
   end)
+  
+  if not ok then
+    -- Error occurred, return empty results
+    print("cmp-dbee: Error getting models for schema '" .. schema .. "': " .. tostring(result))
+    callback {}
+  end
 end
 
 --- Get column completions for a specific schema and model.
@@ -191,6 +200,9 @@ function Database.get_column_completion(schema, model, callback)
     callback {}
     return
   end
+  
+  -- Add error handling for column operations
+  local ok, result = pcall(function()
 
   if
     Database.column_cache[connection_id.id]
@@ -229,6 +241,13 @@ function Database.get_column_completion(schema, model, callback)
     Database.column_cache[connection_id.id][schema][model] = columns -- Cache the fetched columns
     callback(columns)
   end, 0)
+  end)
+  
+  if not ok then
+    -- Error occurred, return empty results
+    print("cmp-dbee: Error getting columns for " .. schema .. "." .. model .. ": " .. tostring(result))
+    callback {}
+  end
 end
 
 return Database
